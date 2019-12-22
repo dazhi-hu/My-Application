@@ -1,0 +1,717 @@
+package com.example.myapplication;
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.Html;
+import android.view.View;
+import android.view.Window;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.GridView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.calculatortest.R;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.skw.calculator.Calculator;
+
+public class MainActivity extends AppCompatActivity {
+    Button bt1,bt2;
+    /**     * 操作按钮     */
+    private GridView mGridView = null;
+    /**     * 输入框     */
+    private EditText mEditInput = null;
+    /**     * 适配器     */
+    private ArrayAdapter mAdapter = null;
+    /**     * 操作按钮上的字符集合     */
+    private final String[] mTextBtns = new String[]{
+            "Back","(",")","CE",
+            "7","8","9","/",
+            "4","5","6","*",
+            "1","2","3","+",
+            "0",".","=","-",    };
+    /**	 * 已计算的表达式	 */
+    private String mPreStr = "";
+    /**	 * 待计算的表达式	 */
+    private String mLastStr = "";
+    /**	 * 计算结果	 */
+    private Object mResult = null;
+    /**	 * 判断刚刚是否成功执行完一个表达式	 * 因为,刚加一个表达式时,需要在原来的表达式后面加上换行标签	 */
+    private boolean mIsExecuteNow = false;
+    /**	 * 换行符	 */
+    private final String newLine = "<br>";
+    /**	 * 这个函数用于设置EditText的显示内容,主要是为了加上html标签.	 * 所有的显示EditText内容都需要调用此函数	 */
+    private void setText() {
+        final String[] tags = new String[]{
+                "<font color='#858585'>",
+                "<font color='#CD2626'>",
+                "</font> "		};
+        StringBuilder builder = new StringBuilder();
+        // 添加颜色标签
+        builder.append(tags[0]).append(mPreStr).append(tags[2]);
+        builder.append(tags[1]).append(mLastStr).append(tags[2]);
+        // 显示内容
+        mEditInput.setText(Html.fromHtml(builder.toString()));
+        // 设置光标在EditText的最后位置
+        mEditInput.setSelection(mEditInput.getText().length());	}
+    /**	 * 执行 待计算表达式,当用户按下 = 号时,调用这个方法	 */
+    private void executeExpression() {
+        try {
+            // 调用第三方jar包来执行运算
+            mResult = Calculator.execute(mLastStr);		}
+        catch (Exception e) {
+            /**
+             * * 如果捕获到异常,表示表达式执行失败,
+             * * 这里设置为false是因为并没有执行成功,还不能新的表达式求值			 */
+            mIsExecuteNow = false;			return;		}
+        /**
+         * * 若计算结果成功,把 "=" 和 结果 加到待计算表达式,
+         * * 更新视图,
+         * * 设置标识为true		 */
+        mLastStr += "="+ mResult;
+        setText();
+        mIsExecuteNow = true;	}
+    private class OnButtonItemClickListener implements AdapterView.OnItemClickListener {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            String text = (String) parent.getAdapter().getItem(position);
+            if (text.equals("=")) {
+                // 执行运算
+                executeExpression();			} else if (text.equals("Back")) {
+                /**				 * 如果按下退格键,表示删除一个字符
+                * 如果待计算表达式长度为0,则需要把已计算表达式的最后
+                  * 部分赋值给待计算表达式
+                  * 例如：
+                  * 已计算表达式：1+1=2
+                  * 待计算表达式：空
+                  * 按下Back键后：
+                  * 已计算表达式：空
+                  * 待计算表达式：1+1=2
+                  */
+                if (mLastStr.length() == 0) {
+                    /**
+                       * 如果已计算表达式的长度不是0,那么此时
+                       * 已计算表达式必然以换行符结尾
+                       */
+                    if (mPreStr.length() != 0) {
+                        // 清除已计算表达式末尾的换行符
+                        mPreStr = mPreStr.substring(0, mPreStr.length() - newLine.length());
+                        // 找到前一个换行符的位置
+                        int index = mPreStr.lastIndexOf(newLine);
+                        if (index == -1) {
+                            /**
+                             * -1表示没有找到,即 已计算表达式只有一个
+                             * 此时把 仅有的一个已计算表达式赋值给待计算表达式
+                             * 例如：
+                             * 已计算表达式：1+1=2
+                             * 待计算表达式：空
+                             * 按下Back键后：
+                             * 已计算表达式：空
+                             * 待计算表达式：1+1=2
+                             * */
+                            mLastStr = mPreStr;
+                            // 已计算表达式赋值为空
+                            mPreStr = "";
+                        } else {
+                            /**
+                             *  如果找到前一个换行符,即 已计算表达式数量 > 1
+                             *  此时把已计算表达式的最后一个表达式赋值给 待计算表达式
+                             *  例如：
+                             *  已计算表达式：1+1=2
+                             *  2+2=4
+                             *  待计算表达式：空
+                             *  按下Back键后：
+                             *  已计算表达式：1+1=2
+                             *  待计算表达式：2+2=4
+                             *  */
+                            mLastStr = mPreStr.substring(index + newLine.length(), mPreStr.length());
+                            mPreStr = mPreStr.substring(0, index + newLine.length());
+                        }
+                        mIsExecuteNow = true;
+                    }
+                } else {
+                    // 如果待计算表达式长度不是0,则直接减掉一个字符
+                    mLastStr = mLastStr.substring(0, mLastStr.length() - 1);
+                }
+                // 更新视图
+                setText();
+            } else if (text.equals("CE")) {
+                /**
+                 *  如果按下 清除键,就把
+                 *  待计算表达式 和 已计算表达式 全部清空,
+                 *  显示内容全部清空,
+                 *  并设置标识符为false
+                 *  这里需要注意下，
+                 *  待计算表达式 和 已计算表达式 全部清空,
+                 *  并不代表显示内容就清空了。同样，
+                 *  显示内容清空，也不代表 待计算表达式 和 已计算表达式 全部清空。
+                 *  */
+                mPreStr = "";
+                mLastStr = "";
+                mIsExecuteNow = false;
+                mEditInput.setText("");
+            } else {
+                // 按下其他键的情况
+                if (mIsExecuteNow) {
+                    /**
+                     * 如果刚刚成功执行了一个表达式,
+                     * 那么需要把  待计算表达式  加到  已计算表达式 后面并添加换行符
+                     */
+                    mPreStr += mLastStr + newLine;
+                    // 重置标识为false
+                    mIsExecuteNow = false;
+                    /**
+                     * 如果按下的键是 + - * / 中的任何一个，
+                     * 就把刚刚计算完毕的表达式的结果拿过来，
+                     * 放在待计算表达式的开头
+                     *
+                     * 例如:
+                     * 已计算表达式：1+1=2
+                     * 待计算表达式：空
+                     *
+                     * 按下 + 键后：
+                     *
+                     * 已计算表达式：1+1=2
+                     * 待计算表达式：2+
+                     */
+                    if (text.equals("+") || text.equals("-") || text.equals("*") || text.equals("/")) {
+                        mLastStr = mResult + text;
+                    } else {
+                        // 设置待计算表达式的第一个字符为当前按钮按下的内容
+                        mLastStr = text;
+                    }
+                } else {
+                    // 否则直接在待计算表达式后面添加内容就好了
+                    mLastStr += text;
+                }
+                // 更新视图
+                setText();
+            }
+        }
+    }
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // 隐藏标题栏
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        setContentView(R.layout.activity_main);
+        mEditInput = (EditText) findViewById(R.id.edit_input);
+        mGridView = (GridView) findViewById(R.id.grid_buttons);
+        // 创建适配器
+        mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, mTextBtns);
+        // 设置适配器
+        mGridView.setAdapter(mAdapter);
+        mEditInput.setKeyListener(null);
+        // 为操作按钮设置按键监听
+        mGridView.setOnItemClickListener(new OnButtonItemClickListener());
+    //创建监听器
+    bt1 = (Button) findViewById(R.id.butoon_help);
+    bt1.setOnClickListener(listener1);
+    bt2 = (Button) findViewById(R.id.button_exchange);
+    bt2.setOnClickListener(listener2);
+}
+    //实现监听器
+    Button.OnClickListener listener1 = new Button.OnClickListener() {
+        public void onClick(View v) {
+            Intent intent = new Intent(MainActivity.this,Main2Activity.class);
+            startActivity(intent);
+        }
+    };
+    Button.OnClickListener listener2 = new Button.OnClickListener() {
+        public void onClick(View v) {
+            Intent intent = new Intent(MainActivity.this,Main3Activity.class);
+            startActivity(intent);
+        }
+    };
+}
+package com.example.myapplication;
+
+import android.os.Bundle;
+
+import com.example.calculatortest.R;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
+import android.view.View;
+
+public class Main2Activity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main2);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+
+    }
+
+
+}
+
+package com.example.myapplication;
+
+import android.os.Bundle;
+
+import com.example.calculatortest.R;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+
+public class Main3Activity<view, context> extends AppCompatActivity implements View.OnClickListener{
+
+    private EditText editText1;
+    private EditText editText2;
+    private EditText editText3;
+    private EditText editText4;
+    private EditText editText5;
+    private EditText editText6;
+    private EditText editText7;
+    private EditText editText8;
+    private EditText editText9;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main3);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        Button button1 = (Button) findViewById(R.id.button1);
+        Button button2 = (Button) findViewById(R.id.button2);
+        Button button3 = (Button) findViewById(R.id.button3);
+        Button button4 = (Button) findViewById(R.id.button4);
+        Button button5 = (Button) findViewById(R.id.button5);
+        Button button6 = (Button) findViewById(R.id.button6);
+        Button button7 = (Button) findViewById(R.id.button7);
+        Button button8 = (Button) findViewById(R.id.button8);
+        Button button9 = (Button) findViewById(R.id.button9);
+        editText1= (EditText) findViewById(R.id.edit_1);
+        editText2= (EditText) findViewById(R.id.edit_2);
+        editText3= (EditText) findViewById(R.id.edit_3);
+        editText4= (EditText) findViewById(R.id.edit_4);
+        editText5= (EditText) findViewById(R.id.edit_5);
+        editText6= (EditText) findViewById(R.id.edit_6);
+        editText7= (EditText) findViewById(R.id.edit_7);
+        editText8= (EditText) findViewById(R.id.edit_8);
+        editText9= (EditText) findViewById(R.id.edit_9);
+        button1.setOnClickListener(this);
+        button2.setOnClickListener(this);
+        button3.setOnClickListener(this);
+        button4.setOnClickListener(this);
+        button5.setOnClickListener(this);
+        button6.setOnClickListener(this);
+        button7.setOnClickListener(this);
+        button8.setOnClickListener(this);
+        button9.setOnClickListener(this);
+    }
+    @Override
+    public void onClick(View v){
+        switch (v.getId()){
+            case R.id.button1:
+                Float c,f,g;
+                c = Float.parseFloat(editText1.getText().toString());
+                f = c/1000;
+                g = c/1000000;
+                editText2.setText(String.valueOf(f));
+                editText3.setText(String.valueOf(g));
+                break;
+            case R.id.button2:
+                f = Float.parseFloat(editText2.getText().toString());
+                c = f*1000;
+                g = f/1000;
+                editText1.setText(String.valueOf(c));
+                editText3.setText(String.valueOf(g));
+                break;
+            case R.id.button3:
+                g = Float.parseFloat(editText3.getText().toString());
+                c = g*1000000;
+                f = g*1000;
+                editText1.setText(String.valueOf(c));
+                editText2.setText(String.valueOf(f));
+                break;
+            case R.id.button4:
+                Float q,w,e;
+                q = Float.parseFloat(editText4.getText().toString());
+                w = q/1000;
+                e = q/1000000;
+                editText5.setText(String.valueOf(w));
+                editText6.setText(String.valueOf(e));
+                break;
+            case R.id.button5:
+                w = Float.parseFloat(editText5.getText().toString());
+                q = w*1000;
+                e = w/1000;
+                editText4.setText(String.valueOf(q));
+                editText6.setText(String.valueOf(e));
+                break;
+            case R.id.button6:
+                e = Float.parseFloat(editText6.getText().toString());
+                q = e*1000000;
+                w = e*1000;
+                editText4.setText(String.valueOf(q));
+                editText5.setText(String.valueOf(w));
+                break;
+            case R.id.button7:
+                Float r,t,y;
+                r = Float.parseFloat(editText7.getText().toString());
+                t = r*60;
+                y = r*3600;
+                editText8.setText(String.valueOf(t));
+                editText9.setText(String.valueOf(y));
+                break;
+            case R.id.button8:
+                t = Float.parseFloat(editText8.getText().toString());
+                r = t/60;
+                y = t*60;
+                editText7.setText(String.valueOf(r));
+                editText9.setText(String.valueOf(y));
+                break;
+            case R.id.button9:
+                y = Float.parseFloat(editText9.getText().toString());
+                r = y/3600;
+                t = y/60;
+                editText7.setText(String.valueOf(r));
+                editText8.setText(String.valueOf(t));
+                break;
+
+
+            default:
+                    break;
+        }
+
+    }
+
+}<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.example.myapplication.MainActivity" >     <!-- 标题 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="@string/app_name"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:background="@color/colorBlue" />
+    <Button
+        android:id="@+id/butoon_help"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="帮助"
+        />
+
+    <Button
+        android:id="@+id/button_exchange"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="转换" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >         <!--操作界面-->
+        <GridView
+            android:id="@+id/grid_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:numColumns="4"
+            android:layout_margin="10dip"
+            android:verticalSpacing="10dp"
+            android:horizontalSpacing="10dp"
+            android:gravity="center"
+            android:layout_alignParentBottom="true" >
+        </GridView>         <!-- 显示界面 -->
+        <EditText
+            android:id="@+id/edit_input"
+            android:padding="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:singleLine="false"
+            android:hint="@string/hint_text"
+            android:textSize="22sp"
+            android:layout_above="@id/grid_buttons"
+            android:layout_alignParentTop="true"
+            android:gravity="start"/>
+    </RelativeLayout>
+</LinearLayout>
+ <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:theme="@style/AppTheme.AppBarOverlay">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <Button
+            android:id="@+id/button_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/a"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/b"
+            android:textSize="100dp"/>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.myapplication.Main3Activity">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:theme="@style/AppTheme.AppBarOverlay">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <include layout="@layout/content_main3" />
+
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior"
+    tools:context="com.example.myapplication.Main3Activity"
+    tools:showIn="@layout/activity_main3">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="270dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+            <EditText
+                android:id="@+id/edit_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="23dp"  />
+            <EditText
+                android:id="@+id/edit_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="24dp" />
+            <EditText
+                android:id="@+id/edit_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="23dp" />
+            <EditText
+                android:id="@+id/edit_4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="24dp" />
+            <EditText
+                android:id="@+id/edit_5"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="23dp" />
+            <EditText
+                android:id="@+id/edit_6"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="24dp" />
+            <EditText
+                android:id="@+id/edit_7"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="23dp" />
+            <EditText
+                android:id="@+id/edit_8"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="25dp" />
+            <EditText
+                android:id="@+id/edit_9"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="1234567890"
+                android:textSize="25dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="50dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+            <Button
+                android:id="@+id/button1"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button2"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button3"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button4"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button5"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button6"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button7"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button8"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+            <Button
+                android:id="@+id/button9"
+                android:layout_width="match_parent"
+                android:layout_height="53dp"
+                android:text="@string/s10"
+                />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="80dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s1"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s2"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s3"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s4"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s5"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s6"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s7"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s8"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="40dp"
+                android:text="@string/s9"/>
+        </LinearLayout>
+    </LinearLayout>
+
+<resources>
+
+    <string name="app_name">计算器</string>
+    <string name="hint_text">输入表达式</string>
+    <string name="title_activity_main3">Main3Activity</string>
+    <string name="title_activity_main2">Main2Activity</string>
+    <string name="a">后退</string>
+    <string name="b">请开始你的表演。</string>
+    <string name="title_activity_main4">Main4Activity</string>
+    <string name="s1">千米</string>
+    <string name="s2">米</string>
+    <string name="s3">厘米</string>
+    <string name="s4">千克</string>
+    <string name="s5">克</string>
+    <string name="s6">毫克</string>
+    <string name="s7">小时</string>
+    <string name="s8">分钟</string>
+    <string name="s9">秒</string>
+    <string name="s10">转换</string>
+
+</resources>
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.coordinatorlayout.widge
+
+
